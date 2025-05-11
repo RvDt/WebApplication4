@@ -11,28 +11,34 @@ namespace WebApplication4.Controllers
     public class YandexAuthController : ControllerBase
     {
         private readonly HttpClient _client;
+        private readonly RequestQueueService _queueService; // добавлено
 
-        public YandexAuthController(IHttpClientFactory factory)
+        public YandexAuthController(IHttpClientFactory factory, RequestQueueService queueService)
         {
             _client = factory.CreateClient();
+            _queueService = queueService; // сохраняем
         }
 
         [HttpPost("auth")]
         public async Task<IActionResult> Auth([FromBody] CookieRequest request)
         {
-            var cookies = request.Cookies;
+            return await _queueService.Enqueue<IActionResult>(async () =>
+            {
+                var cookies = request.Cookies;
 
-            var csrfToken = await FetchCsrfToken(cookies);
-            if (string.IsNullOrEmpty(csrfToken)) return BadRequest("CSRF token failed");
+                var csrfToken = await FetchCsrfToken(cookies);
+                if (string.IsNullOrEmpty(csrfToken)) return BadRequest("CSRF token failed");
 
-            var xToken = await FetchXToken(cookies, csrfToken);
-            if (string.IsNullOrEmpty(xToken)) return BadRequest("x-token failed");
+                var xToken = await FetchXToken(cookies, csrfToken);
+                if (string.IsNullOrEmpty(xToken)) return BadRequest("x-token failed");
 
-            var userId = await FetchUserId(xToken);
-            if (string.IsNullOrEmpty(userId)) return BadRequest("userId failed");
+                var userId = await FetchUserId(xToken);
+                if (string.IsNullOrEmpty(userId)) return BadRequest("userId failed");
 
-            return Ok(new AuthResponse { UserId = userId, AccessToken = xToken });
+                return Ok(new AuthResponse { UserId = userId, AccessToken = xToken });
+            });
         }
+
 
         [HttpPost("fetch-csrf-token")]
         public async Task<string> FetchCsrfToken(string cookies)
