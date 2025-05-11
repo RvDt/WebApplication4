@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using System.IO.Compression;
+using System.Net;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
+using WebApplication4.WebApplication4.Services;
 
 namespace WebApplication4.Controllers
 {
@@ -22,21 +24,46 @@ namespace WebApplication4.Controllers
         [HttpPost("auth")]
         public async Task<IActionResult> Auth([FromBody] CookieRequest request)
         {
-            return await _queueService.Enqueue<IActionResult>(async () =>
+            try
             {
-                var cookies = request.Cookies;
+                return await _queueService.Enqueue<IActionResult>(async () =>
+                {
+                    if (string.IsNullOrWhiteSpace(request?.Cookies))
+                    {
+                        //_logger.LogWarning("Пустые куки в запросе");
+                        return BadRequest("Необходимы куки для аутентификации");
+                    }
 
-                var csrfToken = await FetchCsrfToken(cookies);
-                if (string.IsNullOrEmpty(csrfToken)) return BadRequest("CSRF token failed");
+                    var csrfToken = await FetchCsrfToken(request.Cookies);
+                    if (string.IsNullOrEmpty(csrfToken))
+                    {
+                        //_logger.LogError("Не удалось получить CSRF токен");
+                        return StatusCode((int)HttpStatusCode.Unauthorized, "CSRF token failed");
+                    }
 
-                var xToken = await FetchXToken(cookies, csrfToken);
-                if (string.IsNullOrEmpty(xToken)) return BadRequest("x-token failed");
+                    var xToken = await FetchXToken(request.Cookies, csrfToken);
+                    if (string.IsNullOrEmpty(xToken))
+                    {
+                        //_logger.LogError("Не удалось получить X-Token");
+                        return StatusCode((int)HttpStatusCode.Unauthorized, "x-token failed");
+                    }
 
-                var userId = await FetchUserId(xToken);
-                if (string.IsNullOrEmpty(userId)) return BadRequest("userId failed");
+                    var userId = await FetchUserId(xToken);
+                    if (string.IsNullOrEmpty(userId))
+                    {
+                        //_logger.LogError("Не удалось получить UserId");
+                        return StatusCode((int)HttpStatusCode.Unauthorized, "userId failed");
+                    }
 
-                return Ok(new AuthResponse { UserId = userId, AccessToken = xToken });
-            });
+                    //_logger.LogInformation("Успешная аутентификация для пользователя {UserId}", userId);
+                    return Ok(new AuthResponse { UserId = userId, AccessToken = xToken });
+                });
+            }
+            catch (Exception ex)
+            {
+                //_logger.LogError(ex, "Ошибка при обработке запроса аутентификации");
+                return StatusCode((int)HttpStatusCode.InternalServerError, "Internal server error");
+            }
         }
 
 

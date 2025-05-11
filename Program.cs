@@ -1,4 +1,5 @@
 using WebApplication4;
+using WebApplication4.WebApplication4.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,6 +12,7 @@ builder.Services.AddSwaggerGen();
 
 builder.Services.AddHttpClient();
 builder.Services.AddSingleton<RequestQueueService>();
+
 
 var app = builder.Build();
 

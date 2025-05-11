@@ -1,28 +1,33 @@
 ﻿namespace WebApplication4
 {
-    // Services/RequestQueueService.cs
     using System;
-    using System.Threading;
     using System.Threading.Tasks;
 
-    public class RequestQueueService
+    namespace WebApplication4.Services
     {
-        private readonly SemaphoreSlim _semaphore = new(1); // Только один запрос за раз
-        private readonly TimeSpan _delayBetweenRequests = TimeSpan.FromSeconds(5); // Задержка между запросами
-
-        public async Task<T> Enqueue<T>(Func<Task<T>> func)
+        public class RequestQueueService
         {
-            await _semaphore.WaitAsync(); // Ждём свою очередь
+            private readonly SemaphoreSlim _semaphore = new(1, 1);
+            private readonly TimeSpan _cooldown = TimeSpan.FromSeconds(5);
 
-            try
+            public async Task<T> Enqueue<T>(Func<Task<T>> action)
             {
-                var result = await func();             // Выполняем запрос
-                await Task.Delay(_delayBetweenRequests); // Задержка между запросами
-                return result;
-            }
-            finally
-            {
-                _semaphore.Release(); // Освобождаем очередь
+                // Если семафор занят (уже выполняется запрос) — отклоняем новый
+                if (!_semaphore.Wait(0))
+                {
+                    throw new Exception("Сервер занят. Попробуйте позже.");
+                }
+
+                try
+                {
+                    var result = await action();
+                    await Task.Delay(_cooldown); // Задержка перед следующим запросом
+                    return result;
+                }
+                finally
+                {
+                    _semaphore.Release();
+                }
             }
         }
     }
