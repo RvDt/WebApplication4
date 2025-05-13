@@ -8,7 +8,7 @@
         public class RequestQueueService
         {
             private readonly SemaphoreSlim _semaphore = new(1, 1);
-            private readonly TimeSpan _cooldown = TimeSpan.FromSeconds(10);
+            private readonly TimeSpan _cooldown = TimeSpan.FromSeconds(5);
 
             public async Task<T> Enqueue<T>(Func<Task<T>> action)
             {
